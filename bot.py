@@ -996,4 +996,4 @@ async def close_test(interaction: discord.Interaction):
 
 
 # Paste your bot token below before running.
-bot.run("DISCORD_TOKEN")
+os.environ["DISCORD_TOKEN"]

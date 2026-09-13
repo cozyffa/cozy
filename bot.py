@@ -8,10 +8,10 @@ import uuid
 import time
 
 # ==================== CONFIGURATION ====================
-TEST_GUILD_ID = 1548356617723183274      # Your Server ID
-RESULTS_CHANNEL_ID = 1548356620197568605  # /result always posts here
+TEST_GUILD_ID = 1452241505719681049      # Your Server ID
+RESULTS_CHANNEL_ID = 1528716272865382520  # /result always posts here
 DATA_FILE = "queue_data.json"             # Where queues / open panels are saved so a restart doesn't wipe them
-QUEUE_CHANNEL_ID = 1548817099651154010     # Queue cards from /openqueue always post here, regardless of where the command is run
+QUEUE_CHANNEL_ID = 1548385609842823198     # Queue cards from /openqueue always post here, regardless of where the command is run
 QUEUE_MAX_SIZE = 10                        # Shown as "x/10" on the queue card; change here if you want a different cap
 COOLDOWN_SECONDS = 5 * 24 * 60 * 60         # 5 days — how long a player must wait before rejoining the SAME kit after their ticket closes
 
@@ -996,4 +996,4 @@ async def close_test(interaction: discord.Interaction):
 
 
 # Paste your bot token below before running.
-bot.run(os.environ.get("DISCORD_TOKEN"))
+bot.run("DISCORD_TOKEN")

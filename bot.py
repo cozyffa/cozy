@@ -995,5 +995,34 @@ async def close_test(interaction: discord.Interaction):
     await interaction.channel.delete()
 
 
-# Paste your bot token below before running.
-os.environ["DISCORD_TOKEN"]
+# ==================== BOT STARTUP ====================
+@bot.event
+async def on_ready():
+    print(f"✅ Bot is ready! Logged in as {bot.user}")
+    try:
+        synced = await bot.tree.sync(guild=discord.Object(id=TEST_GUILD_ID))
+        print(f"✅ Synced {len(synced)} command(s)")
+    except Exception as e:
+        print(f"❌ Failed to sync commands: {e}")
+
+@bot.event
+async def on_error(event, *args, **kwargs):
+    print(f"❌ Error in {event}:")
+    import traceback
+    traceback.print_exc()
+
+if __name__ == "__main__":
+    TOKEN = os.getenv("DISCORD_TOKEN")
+    if not TOKEN:
+        print("❌ DISCORD_TOKEN environment variable is not set!")
+        print("Set it in Railway's Variables section.")
+        exit(1)
+    
+    print("🤖 Starting Cozy SMP bot...")
+    try:
+        bot.run(TOKEN)
+    except Exception as e:
+        print(f"❌ Bot crashed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise

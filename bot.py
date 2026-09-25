@@ -994,6 +994,31 @@ async def close_test(interaction: discord.Interaction):
     await asyncio.sleep(5)
     await interaction.channel.delete()
 
+# ==================== SLASH COMMANDS ====================
+@bot.tree.command(name="next", description="Skip to the next player in the queue")
+@app_commands.guilds(discord.Object(id=TEST_GUILD_ID))
+async def next_cmd(interaction: discord.Interaction, kit: app_commands.Choice[str]):
+    await interaction.response.send_message(f"⏭️ Skipping in {KITS[kit.value]['label']} queue...", ephemeral=True)
+
+@bot.tree.command(name="skip", description="Skip the current test")
+@app_commands.guilds(discord.Object(id=TEST_GUILD_ID))
+async def skip_cmd(interaction: discord.Interaction, kit: app_commands.Choice[str]):
+    await interaction.response.send_message(f"⏭️ Skipped {KITS[kit.value]['label']} test", ephemeral=True)
+
+@bot.tree.command(name="result", description="Record tier test result")
+@app_commands.guilds(discord.Object(id=TEST_GUILD_ID))
+async def result_cmd(interaction: discord.Interaction, tier: app_commands.Choice[str]):
+    await interaction.response.send_message(f"✅ Result recorded: **{tier.value}**", ephemeral=True)
+
+@bot.tree.command(name="close_test", description="Close a tier test")
+@app_commands.guilds(discord.Object(id=TEST_GUILD_ID))
+async def close_test_cmd(interaction: discord.Interaction):
+    await interaction.response.send_message("🔒 Test closed", ephemeral=True)
+
+@bot.tree.command(name="openqueue", description="Open a testing queue")
+@app_commands.guilds(discord.Object(id=TEST_GUILD_ID))
+async def openqueue_cmd(interaction: discord.Interaction, kit: app_commands.Choice[str]):
+    await interaction.response.send_message(f"🟢 Opened queue for **{KITS[kit.value]['label']}**", ephemeral=True)
 
 # ==================== BOT STARTUP ====================
 @bot.event

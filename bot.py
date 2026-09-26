@@ -11,12 +11,13 @@ import time
 TEST_GUILD_ID = 1452241505719681049      # Your Server ID
 RESULTS_CHANNEL_ID = 1528716272865382520  # /result always posts here
 DATA_FILE = "queue_data.json"             # Where queues / open panels are saved so a restart doesn't wipe them
-QUEUE_CHANNEL_ID = 1548385609842823198     # Queue cards from /openqueue always post here, regardless of where the command is run
 QUEUE_MAX_SIZE = 10                        # Shown as "x/10" on the queue card; change here if you want a different cap
 COOLDOWN_SECONDS = 5 * 24 * 60 * 60         # 5 days — how long a player must wait before rejoining the SAME kit after their ticket closes
+TICKET_CATEGORY_ID = 1549195391160033381    # Every ticket channel gets created here instead of matching the queue channel's category
 
 intents = discord.Intents.default()
-intents.guilds = True  # Only intent this bot actually needs — everything here runs on slash commands and buttons
+intents.guilds = True   # Needed for basic server/channel access
+intents.members = True  # Needed so /updatetierlist and the auto-refresh can scan every member's roles
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -26,20 +27,70 @@ TIERS = ["S+", "S", "S-", "A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-"]
 # role required to test it. Everything else (dropdown, choices, lookups) is built from this
 # instead of being retyped in five different places, which is where the old bugs crept in.
 KITS = {
-    "Sword":         {"label": "Sword • FT6",           "emoji": "⚔️", "role": 1529271109738823803, "ping_role": 1548364714864677144},
-    "Axe":           {"label": "Axe • FT6",             "emoji": "🪓", "role": 1548471426552565760, "ping_role": 1548472205296279763},
-    "NPot":          {"label": "NethPot • FT2",         "emoji": "🧪", "role": 1548352220221939732, "ping_role": 1548364883639148674},
-    "DPot":          {"label": "DPot • FT2",            "emoji": "🏺", "role": 1548471627539546243, "ping_role": 1548472400117629078},
-    "DiaSMP":        {"label": "DiaSMP • FT3",          "emoji": "💎", "role": 1529270774387707915, "ping_role": 1548364663937306664},
-    "NetherSMP":     {"label": "NetherSMP • FT2",       "emoji": "🔥", "role": 1548471516964978820, "ping_role": 1548472066959867964},
-    "Mace":          {"label": "Mace • FT3",            "emoji": "🔨", "role": 1529270991937867856, "ping_role": 1548364804735893636},
-    "Spear Mace":    {"label": "Spear Mace • FT3",      "emoji": "🔱", "role": 1548471143730647172, "ping_role": 1548472316038610974},
-    "UHC":           {"label": "UHC • FT3",             "emoji": "🏹", "role": 1548352120598827041, "ping_role": 1548364838651166842},
-    "Cart":          {"label": "Cart",                  "emoji": "🧨", "role": 1548473865489883289, "ping_role": 1548364941717672017},
+    "Sword":         {"label": "Sword • FT6",           "emoji": "⚔️", "role": 1529271109738823803, "ping_role": 1548364714864677144, "queue_channel": 1548918406013526137},
+    "Axe":           {"label": "Axe • FT6",             "emoji": "🪓", "role": 1548471426552565760, "ping_role": 1548472205296279763, "queue_channel": 1548896402543747082},
+    "NPot":          {"label": "NethPot • FT2",         "emoji": "🧪", "role": 1548352220221939732, "ping_role": 1548364883639148674, "queue_channel": 1548898461502668820},
+    "DPot":          {"label": "DPot • FT2",            "emoji": "🏺", "role": 1548471627539546243, "ping_role": 1548472400117629078, "queue_channel": 1548898394523574332},
+    "DiaSMP":        {"label": "DiaSMP • FT3",          "emoji": "💎", "role": 1529270774387707915, "ping_role": 1548364663937306664, "queue_channel": 1548898209714278401},
+    "NetherSMP":     {"label": "NetherSMP • FT2",       "emoji": "🔥", "role": 1548471516964978820, "ping_role": 1548472066959867964, "queue_channel": 1548898304023339048},
+    "Mace":          {"label": "Mace • FT3",            "emoji": "🔨", "role": 1529270991937867856, "ping_role": 1548364804735893636, "queue_channel": 1548895861063549008},
+    "Spear Mace":    {"label": "Spear Mace • FT3",      "emoji": "🔱", "role": 1548471143730647172, "ping_role": 1548472316038610974, "queue_channel": 1548896255080407110},
+    "UHC":           {"label": "UHC • FT3",             "emoji": "🏹", "role": 1548352120598827041, "ping_role": 1548364838651166842, "queue_channel": 1548898689840578590},
+    "Cart":          {"label": "Cart",                  "emoji": "🧨", "role": 1548473865489883289, "ping_role": 1548364941717672017, "queue_channel": 1548896331903410176},
 }
 
 KIT_CHOICES = [app_commands.Choice(name=info["label"], value=key) for key, info in KITS.items()]
 TIER_CHOICES = [app_commands.Choice(name=t, value=t) for t in TIERS]
+
+# Where each kit's auto-updating leaderboard lives, and the short title used in its header
+TIERLIST_CONFIG = {
+    "NetherSMP":   {"channel": 1528711256498901023, "title": "NSMP"},
+    "DiaSMP":      {"channel": 1528712196677304380, "title": "DSMP"},
+    "Mace":        {"channel": 1528712096362270740, "title": "MACE"},
+    "Spear Mace":  {"channel": 1549203188467503215, "title": "SPEARMACE"},
+    "Sword":       {"channel": 1528711993782173857, "title": "SWORD"},
+    "Axe":         {"channel": 1549203094816948324, "title": "AXE"},
+    "NPot":        {"channel": 1528711797673295903, "title": "NPOT"},
+    "DPot":        {"channel": 1549202622291124234, "title": "DPOT"},
+    "Cart":        {"channel": 1528711725594185878, "title": "CART"},
+    "UHC":         {"channel": 1549202511636865095, "title": "UHC"},
+}
+
+TIER_EMOJIS = {
+    "S+": "🏆", "S": "🥇", "S-": "🥈", "A+": "🥉", "A": "⭐", "A-": "🎖️",
+    "B+": "🔥", "B": "🟢", "B-": "🔰", "C+": "🟡", "C": "🔵", "C-": "⚪",
+}
+
+
+def to_bold_serif(text: str) -> str:
+    """Converts plain text to 𝐁𝐨𝐥𝐝 𝐒𝐞𝐫𝐢𝐟 Unicode (used for leaderboard titles)."""
+    out = []
+    for c in text:
+        if "A" <= c <= "Z":
+            out.append(chr(ord(c) + 0x1D400 - ord("A")))
+        elif "a" <= c <= "z":
+            out.append(chr(ord(c) + 0x1D41A - ord("a")))
+        elif "0" <= c <= "9":
+            out.append(chr(ord(c) + 0x1D7CE - ord("0")))
+        else:
+            out.append(c)
+    return "".join(out)
+
+
+def to_bold_sans(text: str) -> str:
+    """Converts plain text to 𝗕𝗼𝗹𝗱 𝗦𝗮𝗻𝘀 Unicode (used for tier labels and footer text)."""
+    out = []
+    for c in text:
+        if "A" <= c <= "Z":
+            out.append(chr(ord(c) + 0x1D5D4 - ord("A")))
+        elif "a" <= c <= "z":
+            out.append(chr(ord(c) + 0x1D5EE - ord("a")))
+        elif "0" <= c <= "9":
+            out.append(chr(ord(c) + 0x1D7EC - ord("0")))
+        else:
+            out.append(c)
+    return "".join(out)
+
 
 # Tier role IDs per kit. A value of None means that tier's role hasn't been created/given yet —
 # /result will still work, it just skips the automatic role swap for that specific tier/kit and
@@ -126,6 +177,10 @@ class QueueManager:
         self.open_panels = {}                              # kit -> {"channel_id", "message_id", "queue_id", "locked", "tester_id"}
         self.ticket_players = {}                           # str(channel_id) -> {"user_id", "name_ans", "kit"}
         self.cooldowns = {}                                 # str(user_id) -> {kit: expiry_unix_timestamp}
+        self.last_session = {}                              # kit -> unix timestamp of when its queue was last closed
+        self.last_message = {}                              # kit -> {"channel_id", "message_id"} of the most recent panel/closed card, even after closing
+        self.tierlist_message = {}                          # kit -> {"channel_id", "message_id"} of the posted leaderboard message
+        self.player_igns = {}                               # str(user_id) -> most recently known Minecraft IGN
         self.load()
 
     def load(self):
@@ -137,6 +192,10 @@ class QueueManager:
                 self.open_panels = data.get("open_panels", {})
                 self.ticket_players = data.get("ticket_players", {})
                 self.cooldowns = data.get("cooldowns", {})
+                self.last_session = data.get("last_session", {})
+                self.last_message = data.get("last_message", {})
+                self.tierlist_message = data.get("tierlist_message", {})
+                self.player_igns = data.get("player_igns", {})
                 for kit, players in self.queues.items():
                     for p in players:
                         self.user_index[p["user_id"]] = kit
@@ -150,6 +209,10 @@ class QueueManager:
                 "open_panels": self.open_panels,
                 "ticket_players": self.ticket_players,
                 "cooldowns": self.cooldowns,
+                "last_session": self.last_session,
+                "last_message": self.last_message,
+                "tierlist_message": self.tierlist_message,
+                "player_igns": self.player_igns,
             }, f)
 
     def set_cooldown(self, user_id: int, kit: str):
@@ -217,6 +280,25 @@ class QueueManager:
         self.open_panels.pop(kit, None)
         self.save()
 
+    def record_close(self, kit: str):
+        self.last_session[kit] = time.time()
+        self.save()
+
+    def record_message(self, kit: str, channel_id: int, message_id: int):
+        self.last_message[kit] = {"channel_id": channel_id, "message_id": message_id}
+        self.save()
+
+    def record_tierlist_message(self, kit: str, channel_id: int, message_id: int):
+        self.tierlist_message[kit] = {"channel_id": channel_id, "message_id": message_id}
+        self.save()
+
+    def set_ign(self, user_id: int, ign: str):
+        self.player_igns[str(user_id)] = ign
+        self.save()
+
+    def get_ign(self, user_id: int) -> str:
+        return self.player_igns.get(str(user_id))
+
     def set_locked(self, kit: str, locked: bool):
         if kit in self.open_panels:
             self.open_panels[kit]["locked"] = locked
@@ -238,7 +320,7 @@ def has_tester_role(member: discord.Member, kit: str) -> bool:
     return any(r.id == role_id for r in member.roles)
 
 
-TIER_TESTER_ROLE_ID = 1548720427755380819  # Can run queue-management commands without needing Administrator
+TIER_TESTER_ROLE_ID = 1501209489867673700  # Can run queue-management commands without needing Administrator
 
 
 def is_tier_tester():
@@ -296,6 +378,7 @@ class TierApplicationModal(discord.ui.Modal, title="Cozy SMP Tier Test Applicati
             return
 
         position = queues.join(self.kit, interaction.user.id, self.player_name.value, self.gamemode_input.value)
+        queues.set_ign(interaction.user.id, self.player_name.value)
 
         await interaction.response.send_message(
             f"✅ **Application Submitted!**\n"
@@ -370,13 +453,28 @@ def make_progress_bar(current: int, maximum: int, length: int = 10) -> str:
     return "█" * filled + "░" * (length - filled)
 
 
+def build_closed_embed(kit: str) -> discord.Embed:
+    description = (
+        "There's no available tester at the time.\n"
+        "You will be pinged when a tester is available.\n"
+        "Comeback later!"
+    )
+    last_closed = queues.last_session.get(kit)
+    if last_closed:
+        description += f"\n\n*Last testing session: <t:{int(last_closed)}:R>*"
+
+    return discord.Embed(
+        title=f"{KITS[kit]['emoji']} {KITS[kit]['label']} Queue",
+        description=description,
+        color=discord.Color.from_rgb(255, 140, 0),
+    )
+
+
 def build_queue_embed(kit: str) -> discord.Embed:
     panel = queues.open_panels[kit]
     players = queues.queues[kit]
     count = len(players)
     max_size = QUEUE_MAX_SIZE
-    pct = int((count / max_size) * 100) if max_size else 0
-    bar = make_progress_bar(count, max_size)
     status = "🔒 Locked" if panel["locked"] else "🟢 Open"
     tester_value = f"<@{panel['tester_id']}>" if panel.get("tester_id") else "Unassigned"
     next_value = players[0]["name_ans"] if players else "None"
@@ -387,13 +485,12 @@ def build_queue_embed(kit: str) -> discord.Embed:
     )
 
     if players:
-        lines = [f"`{i}.` **{p['name_ans']}**" for i, p in enumerate(players[:max_size], start=1)]
+        lines = [f"`{i}.` **{p['name_ans']}** — <@{p['user_id']}>" for i, p in enumerate(players[:max_size], start=1)]
         embed.add_field(name=f"Players in Queue • {count} Players", value="\n".join(lines), inline=False)
     else:
         embed.add_field(name="Players in Queue • 0 Players", value="_No one is waiting yet._", inline=False)
 
     embed.add_field(name="Status", value=status, inline=True)
-    embed.add_field(name="Players", value=f"{bar} {count}/{max_size} • {pct}%", inline=True)
     embed.add_field(name="Tester", value=tester_value, inline=True)
     embed.add_field(name="Next", value=f"➡️ {next_value}", inline=True)
     embed.set_footer(text=f"Queue ID: {panel['queue_id']}")
@@ -438,6 +535,7 @@ class JoinQueueModal(discord.ui.Modal, title="Join the Queue"):
             return
 
         position = queues.join(self.kit, interaction.user.id, self.player_name.value)
+        queues.set_ign(interaction.user.id, self.player_name.value)
         await interaction.response.send_message(
             f"✅ Joined the **{KITS[self.kit]['label']}** queue at position **#{position}**.", ephemeral=True
         )
@@ -504,8 +602,12 @@ class TicketControlView(discord.ui.View):
 
 async def create_ticket_for(interaction: discord.Interaction, kit: str, player_data: dict):
     guild = interaction.guild
-    target_player = guild.get_member(player_data["user_id"])
-    if target_player is None:
+    try:
+        # fetch_member asks Discord directly instead of relying on the bot's local member
+        # cache, which is often incomplete without the (privileged) Members intent enabled —
+        # that gap was causing "player is no longer in the server" for players who ARE still here.
+        target_player = await guild.fetch_member(player_data["user_id"])
+    except discord.NotFound:
         await interaction.followup.send("⚠️ That player is no longer in the server.", ephemeral=True)
         return None
 
@@ -514,41 +616,46 @@ async def create_ticket_for(interaction: discord.Interaction, kit: str, player_d
         guild.default_role: discord.PermissionOverwrite(read_messages=False),
         target_player: discord.PermissionOverwrite(read_messages=True, send_messages=True),
         interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+        guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True),  # ensures the bot can always post in tickets it creates
     }
     if required_role:
         overwrites[required_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+    tier_tester_role = guild.get_role(TIER_TESTER_ROLE_ID)
+    if tier_tester_role:
+        overwrites[tier_tester_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
 
+    ticket_category = guild.get_channel(TICKET_CATEGORY_ID)
     ticket_channel = await guild.create_text_channel(
         name=f"{kit.lower().replace(' ', '-')}-{target_player.name}",
-        category=interaction.channel.category,
+        category=ticket_category,
         overwrites=overwrites,
     )
     queues.record_ticket(ticket_channel.id, target_player.id, player_data["name_ans"], kit)
-    await ticket_channel.send(
-        f"🏁 {target_player.mention} welcome to your **{KITS[kit]['label']}** tier test room!\n"
-        f"📋 **Name Provided:** `{player_data['name_ans']}`\n\n"
-        f"Your assigned tester is {interaction.user.mention}.",
-        view=TicketControlView(kit, ticket_channel.id),
-    )
+    try:
+        await ticket_channel.send(
+            f"🏁 {target_player.mention} welcome to your **{KITS[kit]['label']}** tier test room!\n"
+            f"📋 **Name Provided:** `{player_data['name_ans']}`\n\n"
+            f"Your assigned tester is {interaction.user.mention}.",
+            view=TicketControlView(kit, ticket_channel.id),
+        )
+    except discord.Forbidden:
+        await interaction.followup.send(
+            f"⚠️ Ticket {ticket_channel.mention} was created, but I couldn't post the welcome message in it — "
+            "check my permission overwrites in that channel.",
+            ephemeral=True,
+        )
     return ticket_channel
 
 
 class QueueControlView(discord.ui.View):
-    """The full queue card: join/leave for players, plus tester-only management buttons.
-    Rows match the layout: [Join, Leave] / [Open Ticket, Lock, Close] / [Next, Skip]."""
+    """The queue card's player-facing controls. Management actions (open ticket, lock,
+    close, next, skip) are handled via slash commands instead of buttons here."""
     def __init__(self, kit: str):
         super().__init__(timeout=None)
         self.kit = kit
-        panel = queues.open_panels.get(kit, {})
-        locked = panel.get("locked", False)
 
         self._add(discord.ButtonStyle.success, "Join Queue", "✅", 0, self.join_callback)
         self._add(discord.ButtonStyle.danger, "Leave Queue", "🚪", 0, self.leave_callback)
-        self._add(discord.ButtonStyle.secondary, "Open Ticket", "🎫", 1, self.open_ticket_callback)
-        self._add(discord.ButtonStyle.danger, "Unlock" if locked else "Lock", "🔓" if locked else "🔒", 1, self.lock_callback)
-        self._add(discord.ButtonStyle.danger, "Close Queue", "❌", 1, self.close_callback)
-        self._add(discord.ButtonStyle.primary, "Next Player", "⏭️", 2, self.next_callback)
-        self._add(discord.ButtonStyle.primary, "Skip Player", "⏩", 2, self.skip_callback)
 
     def _add(self, style, label, emoji, row, callback):
         button = discord.ui.Button(style=style, label=label, emoji=emoji, row=row, custom_id=f"{label.lower().replace(' ', '_')}::{self.kit}")
@@ -751,22 +858,19 @@ class NotificationView(discord.ui.View):
 
 
 def create_notification_embed():
-    return discord.Embed(
-        title="✅ 🖊️ Tester Notification Configuration",
+    embed = discord.Embed(
+        title="🔔 Tier Test Notifications",
         description=(
-            "Welcome to the **Automated Queue Notification System**.\n"
-            "By selecting gamemodes from the dropdown below, you'll be instantly subscribed to receive "
-            "ping alerts whenever a new testing queue opens for those gamemodes.\n\n"
-            "**🎯 How to use**\n"
-            "1. Click the dropdown menu below.\n"
-            "2. Select **one or multiple** gamemodes you wish to test.\n"
-            "3. Click away to save your preferences.\n\n"
-            "**🔔 Unsubscribing**\n"
-            "To stop receiving notifications, simply open the dropdown again and **uncheck** the gamemodes "
-            "you no longer want to be pinged for."
+            "A clean control panel for managing your ping notifications.\n"
+            "Pick your gamemodes below to get notified the moment a queue opens for them.\n\n"
+            "• Select the gamemodes you want to be notified for.\n"
+            "↳ Get pinged the moment a queue opens.\n"
+            "↳ Join before the queue fills up.\n"
+            "↳ Uncheck anytime to unsubscribe."
         ),
         color=discord.Color.from_rgb(255, 140, 0),
     )
+    return embed
 
 
 # ==================== COMMANDS ====================
@@ -790,29 +894,51 @@ async def setup_queue(interaction: discord.Interaction):
 @is_tier_tester()
 async def openqueue(interaction: discord.Interaction, gamemode: app_commands.Choice[str]):
     kit = gamemode.value
-    target_channel = bot.get_channel(QUEUE_CHANNEL_ID) or await bot.fetch_channel(QUEUE_CHANNEL_ID)
+    channel_id = KITS[kit]["queue_channel"]
+    target_channel = bot.get_channel(channel_id) or await bot.fetch_channel(channel_id)
     if target_channel is None:
-        await interaction.response.send_message("❌ Couldn't find the configured queue channel. Check QUEUE_CHANNEL_ID.", ephemeral=True)
+        await interaction.response.send_message(f"❌ Couldn't find the queue channel configured for **{KITS[kit]['label']}**.", ephemeral=True)
         return
-
-    await interaction.response.send_message(f"✅ Opened the **{KITS[kit]['label']}** queue in {target_channel.mention}.", ephemeral=True)
 
     role = interaction.guild.get_role(KITS[kit]["ping_role"])
     ping_content = role.mention if role else None
+
+    # Delete any leftover card from a previous session (e.g. a "no tester available" closed
+    # card) so opening a queue never leaves stale messages piling up in the channel.
+    old_message = queues.last_message.get(kit)
+    if old_message:
+        try:
+            old_channel = bot.get_channel(old_message["channel_id"]) or await bot.fetch_channel(old_message["channel_id"])
+            old_msg_obj = await old_channel.fetch_message(old_message["message_id"])
+            await old_msg_obj.delete()
+        except (discord.NotFound, discord.Forbidden):
+            pass
 
     # Register the panel state first so build_queue_embed() has something to read
     queues.set_panel(kit, target_channel.id, message_id=0, tester_id=interaction.user.id)
     view = QueueControlView(kit)
     bot.add_view(view)
 
-    msg = await target_channel.send(
-        content=ping_content,
-        embed=build_queue_embed(kit),
-        view=view,
-        allowed_mentions=discord.AllowedMentions(roles=True),
-    )
+    try:
+        msg = await target_channel.send(
+            content=ping_content,
+            embed=build_queue_embed(kit),
+            view=view,
+            allowed_mentions=discord.AllowedMentions(roles=True),
+        )
+    except discord.Forbidden:
+        queues.clear_panel(kit)
+        await interaction.response.send_message(
+            f"❌ I don't have access to {target_channel.mention} — check that I can View Channel and Send Messages there "
+            "(channel-specific permission overrides can block a bot even if it has those permissions server-wide).",
+            ephemeral=True,
+        )
+        return
+
     queues.open_panels[kit]["message_id"] = msg.id
     queues.save()
+    queues.record_message(kit, target_channel.id, msg.id)
+    await interaction.response.send_message(f"✅ Opened the **{KITS[kit]['label']}** queue in {target_channel.mention}.", ephemeral=True)
 
 
 @bot.tree.command(name="closequeue", description="Closes the open queue card for a gamemode and clears its waitlist.")
@@ -827,15 +953,17 @@ async def closequeue(interaction: discord.Interaction, gamemode: app_commands.Ch
         try:
             channel = bot.get_channel(panel["channel_id"]) or await bot.fetch_channel(panel["channel_id"])
             message = await channel.fetch_message(panel["message_id"])
-            await message.delete()
+            await message.edit(content=None, embed=build_closed_embed(kit), view=None)
+            queues.record_message(kit, panel["channel_id"], panel["message_id"])
         except discord.NotFound:
             pass
         except Exception as e:
-            print(f"Couldn't delete queue panel message: {e}")
+            print(f"Couldn't update queue panel message on close: {e}")
 
     for player in queues.queues.get(kit, []):
         queues.user_index.pop(player["user_id"], None)
     queues.queues[kit] = []
+    queues.record_close(kit)
     queues.clear_panel(kit)
 
     await interaction.response.send_message(f"🔒 Closed the **{KITS[kit]['label']}** queue and cleared its waitlist.", ephemeral=True)
@@ -880,6 +1008,75 @@ async def skip(interaction: discord.Interaction, gamemode: app_commands.Choice[s
     await _pull_next(interaction, gamemode.value, open_ticket=False)
 
 
+def get_current_tier(member: discord.Member, kit: str) -> str:
+    """Looks at the member's actual roles to find which tier (if any) they currently hold
+    for this kit. Returns 'N/A' if they don't have any tier role for it."""
+    tier_map = KIT_TIER_ROLES.get(kit, {})
+    member_role_ids = {r.id for r in member.roles}
+    for tier, role_id in tier_map.items():
+        if role_id is not None and role_id in member_role_ids:
+            return tier
+    return "N/A"
+
+
+async def build_tierlist_content(guild: discord.Guild, kit: str) -> str:
+    tier_map = KIT_TIER_ROLES.get(kit, {})
+    role_to_tier = {role_id: tier for tier, role_id in tier_map.items() if role_id is not None}
+    members_by_tier = {tier: [] for tier in TIERS}
+
+    async for member in guild.fetch_members(limit=None):
+        member_role_ids = {r.id for r in member.roles}
+        for role_id, tier in role_to_tier.items():
+            if role_id in member_role_ids:
+                display = queues.get_ign(member.id) or member.display_name
+                members_by_tier[tier].append(display)
+                break  # a member should only hold one tier role per kit
+
+    title = TIERLIST_CONFIG[kit]["title"]
+    lines = [
+        "╔══════════════════════════╗",
+        f"✦ {to_bold_serif(title)} {to_bold_serif('LEADERBOARD')} ✦",
+        "╚══════════════════════════╝",
+    ]
+    for tier in TIERS:
+        emoji = TIER_EMOJIS[tier]
+        bar = "━" * (17 if len(tier) == 1 else 16)
+        lines.append(f"━━━ {emoji} {to_bold_sans(tier)} {bar}")
+        for name in members_by_tier[tier]:
+            lines.append(f"- {name}")
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+    today = time.strftime("%B %d, %Y", time.gmtime())
+    lines.append(f"📅 {to_bold_sans('Last Updated')}: {today}")
+    return "\n".join(lines)
+
+
+async def refresh_tierlist(guild: discord.Guild, kit: str):
+    config = TIERLIST_CONFIG.get(kit)
+    if config is None:
+        return
+    channel_id = config["channel"]
+    channel = bot.get_channel(channel_id) or await bot.fetch_channel(channel_id)
+    if channel is None:
+        return
+
+    content = await build_tierlist_content(guild, kit)
+    existing = queues.tierlist_message.get(kit)
+
+    if existing:
+        try:
+            message = await channel.fetch_message(existing["message_id"])
+            await message.edit(content=content)
+            return
+        except (discord.NotFound, discord.Forbidden):
+            pass  # fall through and post a fresh one
+
+    try:
+        message = await channel.send(content)
+        queues.record_tierlist_message(kit, channel_id, message.id)
+    except discord.Forbidden:
+        print(f"[Tierlist] Missing access to post in channel {channel_id} for {kit}")
+
+
 async def apply_tier_role(guild: discord.Guild, member: discord.Member, kit: str, rank_earned: str) -> str:
     """Removes any tier role the member holds for this kit and gives them the new one.
     Returns a short status string to include in the tester's confirmation message."""
@@ -911,28 +1108,32 @@ async def apply_tier_role(guild: discord.Guild, member: discord.Member, kit: str
 @bot.tree.command(name="result", description="Posts a tier test result. Run inside a test ticket to auto-fill the player.")
 @app_commands.describe(
     score="Match score, e.g. 6-0",
-    previous_tier="Tier the player held before this test",
     rank_earned="Tier awarded from this test",
     player="Only needed if NOT running this inside the player's ticket channel",
     username="Only needed if NOT running this inside the player's ticket channel",
     gamemode="Only needed if NOT running this inside the player's ticket channel",
 )
-@app_commands.choices(gamemode=KIT_CHOICES, previous_tier=TIER_CHOICES, rank_earned=TIER_CHOICES)
+@app_commands.choices(gamemode=KIT_CHOICES, rank_earned=TIER_CHOICES)
 async def result(
     interaction: discord.Interaction,
     score: str,
-    previous_tier: app_commands.Choice[str],
     rank_earned: app_commands.Choice[str],
     player: discord.Member = None,
     username: str = None,
     gamemode: app_commands.Choice[str] = None,
 ):
+    # Defer immediately — this command does several sequential API calls (posting the embed,
+    # saving the cooldown, adding/removing tier roles) that together can exceed Discord's
+    # 3-second reply window, which caused "Unknown interaction" errors. Deferring acknowledges
+    # the interaction right away; everything else below replies via followup instead.
+    await interaction.response.defer(ephemeral=True)
+
     # Auto-fill from the ticket this command was run in, if we recognize the channel
     ticket_info = queues.get_ticket_player(interaction.channel.id)
 
     kit = gamemode.value if gamemode else (ticket_info["kit"] if ticket_info else None)
     if kit is None:
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "❌ I can't tell which kit this is for. Run this inside the player's ticket channel, or specify `gamemode` manually.",
             ephemeral=True,
         )
@@ -941,32 +1142,36 @@ async def result(
     if not has_tester_role(interaction.user, kit):
         role = interaction.guild.get_role(KITS[kit]["role"])
         role_display = role.name if role else "Specialized Tester"
-        await interaction.response.send_message(f"❌ Access Denied: You need the **{role_display}** role to post results for this kit.", ephemeral=True)
+        await interaction.followup.send(f"❌ Access Denied: You need the **{role_display}** role to post results for this kit.", ephemeral=True)
         return
 
     if player is None:
         if ticket_info is None:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "❌ I couldn't find a player for this ticket. Run this inside the player's ticket channel, or specify `player` manually.",
                 ephemeral=True,
             )
             return
-        player = interaction.guild.get_member(ticket_info["user_id"])
-        if player is None:
-            await interaction.response.send_message("❌ That player is no longer in the server.", ephemeral=True)
+        try:
+            player = await interaction.guild.fetch_member(ticket_info["user_id"])
+        except discord.NotFound:
+            await interaction.followup.send("❌ That player is no longer in the server.", ephemeral=True)
             return
 
     if username is None:
         username = ticket_info["name_ans"] if ticket_info else player.display_name
 
+    previous_tier_value = get_current_tier(player, kit)
+    queues.set_ign(player.id, username)
+
     embed = discord.Embed(color=discord.Color.from_rgb(255, 140, 0))
     embed.set_author(name=f"{player.display_name}'s Test Results 🏆", icon_url=player.display_avatar.url)
-    embed.add_field(name="Tester", value=interaction.user.mention, inline=True)
-    embed.add_field(name="Kit", value=KITS[kit]["label"], inline=True)
-    embed.add_field(name="Username", value=username, inline=True)
-    embed.add_field(name="Score", value=score, inline=True)
-    embed.add_field(name="Previous Tier", value=previous_tier.value, inline=True)
-    embed.add_field(name="Rank Earned", value=f"**{rank_earned.value}**", inline=True)
+    embed.add_field(name="Tester", value=interaction.user.mention, inline=False)
+    embed.add_field(name="Kit", value=KITS[kit]["label"], inline=False)
+    embed.add_field(name="Username", value=username, inline=False)
+    embed.add_field(name="Score", value=score, inline=False)
+    embed.add_field(name="Previous Tier", value=previous_tier_value, inline=False)
+    embed.add_field(name="Rank Earned", value=f"**{rank_earned.value}**", inline=False)
 
     target_channel = interaction.channel
     if RESULTS_CHANNEL_ID:
@@ -978,72 +1183,72 @@ async def result(
     await target_channel.send(content=player.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
     queues.set_cooldown(player.id, kit)
     role_status = await apply_tier_role(interaction.guild, player, kit, rank_earned.value)
+    if kit in TIERLIST_CONFIG:
+        await refresh_tierlist(interaction.guild, kit)
 
-    confirmation = f"✅ Result posted{' in ' + target_channel.mention if target_channel.id != interaction.channel.id else ''}.\n{role_status}"
-    await interaction.response.send_message(confirmation, ephemeral=True)
+    is_this_a_ticket = ticket_info is not None and ticket_info["user_id"] == player.id
+    if is_this_a_ticket:
+        confirmation = f"✅ Result posted{' in ' + target_channel.mention if target_channel.id != interaction.channel.id else ''}.\n{role_status}\n🗑️ Closing this ticket in 5 seconds..."
+        await interaction.followup.send(confirmation, ephemeral=True)
+        await asyncio.sleep(5)
+        try:
+            await interaction.channel.delete()
+        except discord.HTTPException:
+            pass
+    else:
+        confirmation = f"✅ Result posted{' in ' + target_channel.mention if target_channel.id != interaction.channel.id else ''}.\n{role_status}"
+        await interaction.followup.send(confirmation, ephemeral=True)
+
+
+@bot.tree.command(name="setign", description="Manually sets a member's IGN, used on the leaderboards.")
+@app_commands.describe(member="Who to set the IGN for", ign="Their Minecraft username")
+@is_tier_tester()
+async def setign(interaction: discord.Interaction, member: discord.Member, ign: str):
+    queues.set_ign(member.id, ign)
+    await interaction.response.send_message(
+        f"✅ Set {member.mention}'s IGN to `{ign}`. Run `/updatetierlist` on any kit they're ranked in to refresh it there.",
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="updatetierlist", description="Manually refreshes a kit's leaderboard channel.")
+@app_commands.describe(gamemode="Which kit's leaderboard to refresh")
+@app_commands.choices(gamemode=KIT_CHOICES)
+@is_tier_tester()
+async def updatetierlist(interaction: discord.Interaction, gamemode: app_commands.Choice[str]):
+    kit = gamemode.value
+    if kit not in TIERLIST_CONFIG:
+        await interaction.response.send_message(f"❌ No leaderboard channel is configured for **{KITS[kit]['label']}**.", ephemeral=True)
+        return
+    await interaction.response.defer(ephemeral=True)
+    await refresh_tierlist(interaction.guild, kit)
+    await interaction.followup.send(f"✅ Refreshed the **{KITS[kit]['label']}** leaderboard.", ephemeral=True)
 
 
 @bot.tree.command(name="close_test", description="Closes and deletes the current tier testing channel room.")
 async def close_test(interaction: discord.Interaction):
-    valid_prefixes = tuple(f"{kit.lower().replace(' ', '-')}-" for kit in KITS)
-    if not interaction.channel.name.startswith(valid_prefixes):
-        await interaction.response.send_message("❌ This command can only be used inside an active tier test channel.", ephemeral=True)
+    if queues.get_ticket_player(interaction.channel.id) is None:
+        await interaction.response.send_message(
+            "❌ This command can only be used inside an active ticket channel created by the bot "
+            "(a queue channel like #sword-queue is NOT a ticket, even if its name looks similar).",
+            ephemeral=True,
+        )
         return
 
     await interaction.response.send_message("⚙️ Closing test room channel in 5 seconds...")
     await asyncio.sleep(5)
     await interaction.channel.delete()
 
-# ==================== SLASH COMMANDS ====================
-@bot.tree.command(name="next", description="Skip to the next player in the queue")
-@app_commands.guilds(discord.Object(id=TEST_GUILD_ID))
-async def next_cmd(interaction: discord.Interaction, kit: app_commands.Choice[str]):
-    await interaction.response.send_message(f"⏭️ Skipping in {KITS[kit.value]['label']} queue...", ephemeral=True)
-
-@bot.tree.command(name="skip", description="Skip the current test")
-@app_commands.guilds(discord.Object(id=TEST_GUILD_ID))
-async def skip_cmd(interaction: discord.Interaction, kit: app_commands.Choice[str]):
-    await interaction.response.send_message(f"⏭️ Skipped {KITS[kit.value]['label']} test", ephemeral=True)
-
-@bot.tree.command(name="result", description="Record tier test result")
-@app_commands.guilds(discord.Object(id=TEST_GUILD_ID))
-async def result_cmd(interaction: discord.Interaction, tier: app_commands.Choice[str]):
-    await interaction.response.send_message(f"✅ Result recorded: **{tier.value}**", ephemeral=True)
-
-@bot.tree.command(name="close_test", description="Close a tier test")
-@app_commands.guilds(discord.Object(id=TEST_GUILD_ID))
-async def close_test_cmd(interaction: discord.Interaction):
-    await interaction.response.send_message("🔒 Test closed", ephemeral=True)
-
-@bot.tree.command(name="openqueue", description="Open a testing queue")
-@app_commands.guilds(discord.Object(id=TEST_GUILD_ID))
-async def openqueue_cmd(interaction: discord.Interaction, kit: app_commands.Choice[str]):
-    await interaction.response.send_message(f"🟢 Opened queue for **{KITS[kit.value]['label']}**", ephemeral=True)
 
 # ==================== BOT STARTUP ====================
-@bot.event
-async def on_ready():
-    print(f"✅ Bot is ready! Logged in as {bot.user}")
-    try:
-        synced = await bot.tree.sync(guild=discord.Object(id=TEST_GUILD_ID))
-        print(f"✅ Synced {len(synced)} command(s)")
-    except Exception as e:
-        print(f"❌ Failed to sync commands: {e}")
-
-@bot.event
-async def on_error(event, *args, **kwargs):
-    print(f"❌ Error in {event}:")
-    import traceback
-    traceback.print_exc()
-
 if __name__ == "__main__":
     TOKEN = os.getenv("DISCORD_TOKEN")
     if not TOKEN:
         print("❌ DISCORD_TOKEN environment variable is not set!")
-        print("Set it in Railway's Variables section.")
+        print("Set it in Railway's Variables section (or your local environment).")
         exit(1)
-    
-    print("🤖 Starting Cozy SMP bot...")
+
+    print("🤖 Starting Cozy Tiers bot...")
     try:
         bot.run(TOKEN)
     except Exception as e:
